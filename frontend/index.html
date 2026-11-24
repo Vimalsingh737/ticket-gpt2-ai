@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TicketGPT-2 | From-Scratch Decoder AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-white">TicketGPT-2</h1>
+        <p class="text-sm text-slate-400">From-Scratch GPT-2 Decoder Transformer • ONNX Runtime CPU</p>
+      </div>
+      <span class="text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+        Zero External LLM APIs
+      </span>
+    </div>
+
+    <div class="mb-3 flex flex-wrap gap-2">
+      <span class="text-xs text-slate-400 self-center">Try sample:</span>
+      <button onclick="setSample(0)" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg">Refund Request</button>
+      <button onclick="setSample(1)" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg">Cancel Order</button>
+      <button onclick="setSample(2)" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg">Payment Issue</button>
+    </div>
+
+    <textarea id="msgInput" rows="4"
+      class="w-full bg-slate-950 border border-slate-700 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-blue-500"
+      placeholder="Paste a customer or IT support message..."></textarea>
+
+    <button id="submitBtn" onclick="analyzeMessage()"
+      class="mt-4 w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-semibold py-3 rounded-xl transition">
+      Generate Structured Ticket
+    </button>
+
+    <p id="statusMsg" class="hidden mt-3 text-xs text-amber-400 text-center">
+      Running GPT-2 decoder inference... (First request on Render free tier may take ~45s to wake up.)
+    </p>
+
+    <div id="resultBox" class="hidden mt-6 space-y-4 border-t border-slate-800 pt-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+          <p class="text-xs text-slate-400">Category</p>
+          <p id="resCategory" class="text-base font-semibold text-blue-400 mt-1"></p>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+          <p class="text-xs text-slate-400">Urgency</p>
+          <p id="resUrgency" class="text-base font-semibold mt-1"></p>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+          <p class="text-xs text-slate-400">Intent & Latency</p>
+          <p id="resIntent" class="text-sm font-medium text-slate-200 mt-1"></p>
+        </div>
+      </div>
+
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+        <p class="text-xs text-slate-400 mb-1">Generated Agent Reply</p>
+        <p id="resReply" class="text-sm text-slate-200 leading-relaxed"></p>
+      </div>
+
+      <details class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+        <summary class="text-xs text-slate-400 cursor-pointer">View Raw Decoder JSON</summary>
+        <pre id="resRaw" class="mt-2 text-xs text-emerald-400 overflow-x-auto"></pre>
+      </details>
+    </div>
+  </div>
+
+  <script>
+    // Replace with your live Render URL in Part 4!
+    const API_URL = "http://127.0.0.1:8000/api/triage";
+
+    const SAMPLES = [
+      "I was charged twice for my order and I need an immediate refund!",
+      "Hi, I ordered the wrong item and need help cancelling my purchase.",
+      "My payment failed with an error when I tried paying my invoice."
+    ];
+
+    function setSample(i) {
+      document.getElementById("msgInput").value = SAMPLES[i];
+    }
+
+    async function analyzeMessage() {
+      const message = document.getElementById("msgInput").value.trim();
+      if (!message) return alert("Please enter a support message.");
+
+      const btn = document.getElementById("submitBtn");
+      const status = document.getElementById("statusMsg");
+      btn.disabled = true;
+      status.classList.remove("hidden");
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message })
+        });
+        const data = await res.json();
+        const t = data.ticket;
+
+        document.getElementById("resCategory").textContent = t.category || "N/A";
+        const urgEl = document.getElementById("resUrgency");
+        urgEl.textContent = t.urgency || "Medium";
+        urgEl.className = "text-base font-semibold mt-1 " + (
+          t.urgency === "High" ? "text-rose-400" : t.urgency === "Medium" ? "text-amber-400" : "text-emerald-400"
+        );
+        document.getElementById("resIntent").textContent = `${t.intent || "general"} (${data.latency_ms} ms)`;
+        document.getElementById("resReply").textContent = t.suggested_reply || "";
+        document.getElementById("resRaw").textContent = JSON.stringify(data, null, 2);
+        document.getElementById("resultBox").classList.remove("hidden");
+      } catch (err) {
+        alert("Could not reach backend. Make sure the API server is running.");
+      } finally {
+        btn.disabled = false;
+        status.classList.add("hidden");
+      }
+    }
+  </script>
+</body>
+</html>
